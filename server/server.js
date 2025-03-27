@@ -8,6 +8,7 @@ const path = require("path");
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -18,7 +19,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
-  },
+  }
 });
 
 const upload = multer({ storage });
@@ -42,96 +43,97 @@ db.connect((err) => {
   }
   console.log("Connected to MySQL database");
 
+  // Crear tablas si no existen (versión simplificada)
   db.query(`
     CREATE TABLE IF NOT EXISTS game_settings (
       id INT AUTO_INCREMENT PRIMARY KEY,
       playerSpeed FLOAT NOT NULL
     )
-  `, (err) => {
-    if (err) {
-      console.error("Error creating table:", err);
-    } else {
-      console.log("Table 'game_settings' created or already exists");
-    }
-  });
+  `);
 
   db.query(`
     CREATE TABLE IF NOT EXISTS player_images (
       id INT AUTO_INCREMENT PRIMARY KEY,
       image_url VARCHAR(255) NOT NULL
     )
-  `, (err) => {
-    if (err) {
-      console.error("Error creating table:", err);
-    } else {
-      console.log("Table 'player_images' created or already exists");
-    }
-  });
+  `);
 });
 
 let gameData = { playerSpeed: 5 };
 
-db.query("SELECT playerSpeed FROM game_settings ORDER BY id DESC LIMIT 1", (err, results) => {
-  if (err) {
-    console.error("Error fetching player speed:", err);
-  } else if (results.length > 0) {
-    gameData.playerSpeed = results[0].playerSpeed;
-    console.log("Initial player speed from database:", gameData.playerSpeed);
-  }
-});
-
+// Endpoints
 app.get("/api/player-speed", (req, res) => {
   res.json({ speed: gameData.playerSpeed });
 });
 
-app.post("/api/player-speed", express.json(), (req, res) => {
+app.post("/api/player-speed", (req, res) => {
   const newSpeed = req.body.speed;
-  console.log("Received speed update request:", newSpeed);
+  gameData.playerSpeed = newSpeed;
 
-  if (typeof newSpeed === "number") {
-    gameData.playerSpeed = newSpeed;
-
-    db.query("INSERT INTO game_settings (playerSpeed) VALUES (?)", [newSpeed], (err) => {
-      if (err) {
-        console.error("Error updating player speed:", err);
-        res.status(500).json({ success: false, message: "Database error" });
-      } else {
-        console.log("Player speed updated in database:", newSpeed);
-
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: "player-speed-updated", speed: newSpeed }));
-          }
-        });
-        res.json({ success: true, speed: newSpeed });
+  db.query("INSERT INTO game_settings (playerSpeed) VALUES (?)", [newSpeed], (err) => {
+    if (err) return res.status(500).json({ success: false, message: "Database error" });
+    
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: "player-speed-updated", speed: newSpeed }));
       }
     });
-  } else {
-    console.error("Invalid speed value:", newSpeed);
-    res.status(400).json({ success: false, message: "Invalid speed value" });
-  }
+    res.json({ success: true, speed: newSpeed });
+  });
 });
 
 app.post("/api/upload-image", upload.single("image"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: "No file uploaded" });
-  }
+  if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
 
   const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
 
   db.query("INSERT INTO player_images (image_url) VALUES (?)", [imageUrl], (err) => {
-    if (err) {
-      console.error("Error saving image URL to database:", err);
-      res.status(500).json({ success: false, message: "Database error" });
-    } else {
-      console.log("Image URL saved to database:", imageUrl);
+    if (err) return res.status(500).json({ success: false, message: "Database error" });
+    
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: "player-image-updated", imageUrl }));
+      }
+    });
+    res.json({ success: true, imageUrl });
+  });
+});
 
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: "player-image-updated", imageUrl }));
-        }
-      });
-      res.json({ success: true, imageUrl });
+// Endpoint corregido (sin created_at)
+app.get("/api/player-images", (req, res) => {
+  db.query("SELECT id, image_url FROM player_images ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: "Database error" });
+    res.json({ success: true, images: results });
+  });
+});
+
+app.post("/api/select-image", (req, res) => {
+  const { imageUrl } = req.body;
+  if (!imageUrl) return res.status(400).json({ success: false, message: "No image URL provided" });
+
+  db.query("SELECT id FROM player_images WHERE image_url = ?", [imageUrl], (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: "Database error" });
+    if (results.length === 0) return res.status(404).json({ success: false, message: "Image not found" });
+
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: "player-image-updated", imageUrl }));
+      }
+    });
+    res.json({ success: true, imageUrl });
+  });
+});
+
+app.get("/api/last-player-image", (req, res) => {
+  db.query("SELECT image_url FROM player_images ORDER BY id DESC LIMIT 1", (err, results) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: "Database error" });
+    }
+    
+    if (results.length > 0) {
+      res.json({ success: true, imageUrl: results[0].image_url });
+    } else {
+      res.json({ success: true, imageUrl: null });
     }
   });
 });
@@ -140,20 +142,7 @@ app.use("/uploads", express.static("uploads"));
 
 wss.on("connection", (ws) => {
   console.log("New client connected");
-
-  ws.send(JSON.stringify({ type: "player-speed-updated", speed: gameData.playerSpeed }));
-
-  ws.on("message", (message) => {
-    console.log("Received:", message.toString());
-
-    if (message.toString() === "get-speed") {
-      ws.send(JSON.stringify({ type: "player-speed-updated", speed: gameData.playerSpeed }));
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("Client disconnected");
-  });
+  ws.send(JSON.stringify({ type: "initial-state", speed: gameData.playerSpeed }));
 });
 
 const PORT = 3000;
