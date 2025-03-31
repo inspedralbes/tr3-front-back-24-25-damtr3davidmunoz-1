@@ -43,7 +43,6 @@ db.connect((err) => {
   }
   console.log("Connected to MySQL database");
 
-  // Crear tablas si no existen (versión simplificada)
   db.query(`
     CREATE TABLE IF NOT EXISTS game_settings (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,9 +58,29 @@ db.connect((err) => {
   `);
 });
 
+const gameRooms = new Map();
+const CONNECTION_TIMEOUT = 3600000;
 let gameData = { playerSpeed: 5 };
 
-// Endpoints
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, room] of gameRooms.entries()) {
+    if (now - room.createdAt > CONNECTION_TIMEOUT) {
+      gameRooms.delete(code);
+      console.log(`Sala ${code} eliminada por inactividad`);
+    }
+  }
+}, 60000);
+
+function generateRoomCode(length = 6) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 app.get("/api/player-speed", (req, res) => {
   res.json({ speed: gameData.playerSpeed });
 });
@@ -99,7 +118,6 @@ app.post("/api/upload-image", upload.single("image"), (req, res) => {
   });
 });
 
-// Endpoint corregido (sin created_at)
 app.get("/api/player-images", (req, res) => {
   db.query("SELECT id, image_url FROM player_images ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -126,26 +144,80 @@ app.post("/api/select-image", (req, res) => {
 
 app.get("/api/last-player-image", (req, res) => {
   db.query("SELECT image_url FROM player_images ORDER BY id DESC LIMIT 1", (err, results) => {
-    if (err) {
-      return res.status(500).json({ success: false, message: "Database error" });
-    }
-    
-    if (results.length > 0) {
-      res.json({ success: true, imageUrl: results[0].image_url });
-    } else {
-      res.json({ success: true, imageUrl: null });
+    if (err) return res.status(500).json({ success: false, message: "Database error" });
+    res.json({ success: true, imageUrl: results[0]?.image_url || null });
+  });
+});
+
+app.post("/api/create-room", (req, res) => {
+  const { hostIP, port } = req.body;
+  const roomCode = generateRoomCode();
+  
+  gameRooms.set(roomCode, {
+    hostIP,
+    port,
+    players: [hostIP],
+    createdAt: Date.now()
+  });
+  
+  res.json({ success: true, roomCode });
+});
+
+app.post("/api/join-room", (req, res) => {
+  const { roomCode, playerIP } = req.body;
+  
+  if (!gameRooms.has(roomCode)) {
+    return res.status(404).json({ success: false, message: "Sala no encontrada" });
+  }
+  
+  const room = gameRooms.get(roomCode);
+  room.players.push(playerIP);
+  
+  res.json({ 
+    success: true, 
+    hostIP: room.hostIP,
+    port: room.port
+  });
+});
+
+app.get("/api/active-rooms", (req, res) => {
+  const rooms = Array.from(gameRooms.entries()).map(([code, data]) => ({
+    code,
+    players: data.players.length,
+    createdAt: data.createdAt
+  }));
+  
+  res.json({ success: true, rooms });
+});
+
+wss.on("connection", (ws) => {
+  console.log("Nuevo cliente conectado");
+  
+  ws.send(JSON.stringify({ 
+    type: "initial-state", 
+    speed: gameData.playerSpeed 
+  }));
+  
+  ws.on("message", (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      if (data.type === "game-event") {
+        wss.clients.forEach(client => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(data));
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Error procesando mensaje WebSocket:", e);
     }
   });
 });
 
 app.use("/uploads", express.static("uploads"));
 
-wss.on("connection", (ws) => {
-  console.log("New client connected");
-  ws.send(JSON.stringify({ type: "initial-state", speed: gameData.playerSpeed }));
-});
-
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
