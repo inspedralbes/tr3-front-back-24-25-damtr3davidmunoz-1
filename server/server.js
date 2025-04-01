@@ -149,60 +149,49 @@ app.get("/api/last-player-image", (req, res) => {
   });
 });
 
-app.post("/api/create-room", (req, res) => {
-  const { hostIP, port } = req.body;
-  const roomCode = generateRoomCode();
-  
-  gameRooms.set(roomCode, {
-    hostIP,
-    port,
-    players: [hostIP],
-    createdAt: Date.now()
-  });
-  
-  res.json({ success: true, roomCode });
-});
-
-app.post("/api/join-room", (req, res) => {
-  const { roomCode, playerIP } = req.body;
-  
-  if (!gameRooms.has(roomCode)) {
-    return res.status(404).json({ success: false, message: "Sala no encontrada" });
-  }
-  
-  const room = gameRooms.get(roomCode);
-  room.players.push(playerIP);
-  
-  res.json({ 
-    success: true, 
-    hostIP: room.hostIP,
-    port: room.port
-  });
-});
-
-app.get("/api/active-rooms", (req, res) => {
-  const rooms = Array.from(gameRooms.entries()).map(([code, data]) => ({
-    code,
-    players: data.players.length,
-    createdAt: data.createdAt
-  }));
-  
-  res.json({ success: true, rooms });
-});
-
 wss.on("connection", (ws) => {
   console.log("Nuevo cliente conectado");
-  
-  ws.send(JSON.stringify({ 
-    type: "initial-state", 
-    speed: gameData.playerSpeed 
-  }));
   
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
       
-      if (data.type === "game-event") {
+      if (data.type === "create-room") {
+        const roomCode = generateRoomCode();
+        gameRooms.set(roomCode, {
+          hostIP: data.hostIP,
+          port: data.port,
+          players: [data.hostIP],
+          createdAt: Date.now()
+        });
+        
+        ws.send(JSON.stringify({
+          type: "room-created",
+          success: true,
+          roomCode
+        }));
+      }
+      else if (data.type === "join-room") {
+        if (!gameRooms.has(data.roomCode)) {
+          ws.send(JSON.stringify({
+            type: "join-response",
+            success: false,
+            message: "Sala no encontrada"
+          }));
+          return;
+        }
+        
+        const room = gameRooms.get(data.roomCode);
+        room.players.push(data.playerIP);
+        
+        ws.send(JSON.stringify({
+          type: "join-response",
+          success: true,
+          hostIP: room.hostIP,
+          port: room.port
+        }));
+      }
+      else if (data.type === "game-event") {
         wss.clients.forEach(client => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(data));
