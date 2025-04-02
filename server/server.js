@@ -43,6 +43,7 @@ db.connect((err) => {
   }
   console.log("Connected to MySQL database");
 
+  // Crear tablas si no existen (versión simplificada)
   db.query(`
     CREATE TABLE IF NOT EXISTS game_settings (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -58,29 +59,9 @@ db.connect((err) => {
   `);
 });
 
-const gameRooms = new Map();
-const CONNECTION_TIMEOUT = 3600000;
 let gameData = { playerSpeed: 5 };
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, room] of gameRooms.entries()) {
-    if (now - room.createdAt > CONNECTION_TIMEOUT) {
-      gameRooms.delete(code);
-      console.log(`Sala ${code} eliminada por inactividad`);
-    }
-  }
-}, 60000);
-
-function generateRoomCode(length = 6) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
+// Endpoints
 app.get("/api/player-speed", (req, res) => {
   res.json({ speed: gameData.playerSpeed });
 });
@@ -118,6 +99,7 @@ app.post("/api/upload-image", upload.single("image"), (req, res) => {
   });
 });
 
+// Endpoint corregido (sin created_at)
 app.get("/api/player-images", (req, res) => {
   db.query("SELECT id, image_url FROM player_images ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -144,69 +126,26 @@ app.post("/api/select-image", (req, res) => {
 
 app.get("/api/last-player-image", (req, res) => {
   db.query("SELECT image_url FROM player_images ORDER BY id DESC LIMIT 1", (err, results) => {
-    if (err) return res.status(500).json({ success: false, message: "Database error" });
-    res.json({ success: true, imageUrl: results[0]?.image_url || null });
-  });
-});
-
-wss.on("connection", (ws) => {
-  console.log("Nuevo cliente conectado");
-  
-  ws.on("message", (message) => {
-    try {
-      const data = JSON.parse(message);
-      
-      if (data.type === "create-room") {
-        const roomCode = generateRoomCode();
-        gameRooms.set(roomCode, {
-          hostIP: data.hostIP,
-          port: data.port,
-          players: [data.hostIP],
-          createdAt: Date.now()
-        });
-        
-        ws.send(JSON.stringify({
-          type: "room-created",
-          success: true,
-          roomCode
-        }));
-      }
-      else if (data.type === "join-room") {
-        if (!gameRooms.has(data.roomCode)) {
-          ws.send(JSON.stringify({
-            type: "join-response",
-            success: false,
-            message: "Sala no encontrada"
-          }));
-          return;
-        }
-        
-        const room = gameRooms.get(data.roomCode);
-        room.players.push(data.playerIP);
-        
-        ws.send(JSON.stringify({
-          type: "join-response",
-          success: true,
-          hostIP: room.hostIP,
-          port: room.port
-        }));
-      }
-      else if (data.type === "game-event") {
-        wss.clients.forEach(client => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
-          }
-        });
-      }
-    } catch (e) {
-      console.error("Error procesando mensaje WebSocket:", e);
+    if (err) {
+      return res.status(500).json({ success: false, message: "Database error" });
+    }
+    
+    if (results.length > 0) {
+      res.json({ success: true, imageUrl: results[0].image_url });
+    } else {
+      res.json({ success: true, imageUrl: null });
     }
   });
 });
 
 app.use("/uploads", express.static("uploads"));
 
-const PORT = process.env.PORT || 3000;
+wss.on("connection", (ws) => {
+  console.log("New client connected");
+  ws.send(JSON.stringify({ type: "initial-state", speed: gameData.playerSpeed }));
+});
+
+const PORT = 3000;
 server.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
