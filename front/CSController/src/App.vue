@@ -2,7 +2,6 @@
   <v-app>
     <v-app-bar app color="deep-purple" dark elevation="4">
       <v-app-bar-title class="text-h5 font-weight-bold">
-        <v-icon size="large" class="mr-2">mdi-sail-boat</v-icon>
         PVP Arena Controller
       </v-app-bar-title>
       <v-spacer></v-spacer>
