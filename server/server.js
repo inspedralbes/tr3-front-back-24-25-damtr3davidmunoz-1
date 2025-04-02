@@ -81,23 +81,15 @@ const db = new sqlite3.Database('./game_db.sqlite', sqlite3.OPEN_READWRITE | sql
   });
 });
 
-// ********************* CONFIGURACIÓN PARA ATLAS *********************
-// 🔑 REEMPLAZA ESTO CON TU CADENA DE CONEXIÓN DE ATLAS:
-const atlasUri = process.env.MONGODB_ATLAS_URI || 
-  'mongodb+srv://<davmungon>:<1234>@cluster0.poqdi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-
+// Configuración de MongoDB
+const localUri = 'mongodb://localhost:27017';
 let mongoClient;
 
-async function connectToAtlas() {
+async function connectToMongoDB() {
   try {
-    mongoClient = new MongoClient(atlasUri, {
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 30000,
-      serverSelectionTimeoutMS: 5000
-    });
-    
+    mongoClient = new MongoClient(localUri);
     await mongoClient.connect();
-    console.log('✅ Conectado a MongoDB Atlas');
+    console.log('✅ Conectado a MongoDB Local');
     
     // Crear índices
     const db = mongoClient.db('game_stats');
@@ -105,11 +97,10 @@ async function connectToAtlas() {
     await db.collection('skin_stats').createIndex({ timestamp: 1 });
     
   } catch (err) {
-    console.error('❌ Error conectando a MongoDB Atlas:', err);
-    setTimeout(connectToAtlas, 5000); // Reintentar conexión
+    console.error('❌ Error conectando a MongoDB:', err);
+    setTimeout(connectToMongoDB, 5000); // Reintentar conexión
   }
 }
-// ********************* FIN CONFIGURACIÓN ATLAS *********************
 
 // Variables de estado
 let currentSpeed = 5;
@@ -333,7 +324,7 @@ function broadcastMessage(message) {
 
 async function recordSkinSelection(imageUrl) {
   if (!mongoClient) {
-    await connectToAtlas();
+    await connectToMongoDB();
     if (!mongoClient) return false;
   }
   
@@ -356,12 +347,12 @@ async function recordSkinSelection(imageUrl) {
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
-  await connectToAtlas();
+  await connectToMongoDB();
   server.listen(PORT, () => {
     console.log(`
     Servidor listo en http://localhost:${PORT}
     WebSocket: ws://localhost:${PORT}
-    MongoDB Atlas: ${atlasUri.split('@')[1] || 'No configurado'}
+    MongoDB Local: ${localUri}
     `);
   });
 }

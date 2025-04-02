@@ -1,101 +1,171 @@
 <template>
   <v-app>
-    <v-main>
-      <v-container>
+    <v-app-bar app color="deep-purple" dark elevation="4">
+      <v-app-bar-title class="text-h5 font-weight-bold">
+        <v-icon size="large" class="mr-2">mdi-sail-boat</v-icon>
+        PVP Arena Controller
+      </v-app-bar-title>
+      <v-spacer></v-spacer>
+      <v-btn icon="mdi-refresh" @click="loadExistingImages"></v-btn>
+    </v-app-bar>
+
+    <v-main class="bg-grey-lighten-4">
+      <v-container fluid>
+        <!-- Control Panel - Full Width -->
         <v-row>
-          <!-- Sección existente de velocidad del jugador -->
-          <v-col cols="12" md="6">
-            <v-card>
-              <v-card-title class="primary white--text">
-                Control del Juego
+          <v-col cols="12">
+            <v-card class="elevation-3 rounded-lg gradient-card">
+              <v-card-title class="text-h5 bg-deep-purple text-white py-6 rounded-t-lg d-flex align-center">
+                <v-icon size="32" class="mr-4">mdi-speedometer</v-icon>
+                Control de Velocidad
               </v-card-title>
-              <v-card-text>
-                <v-text-field
-                  v-model.number="playerSpeed"
-                  label="Velocidad del Jugador"
-                  type="number"
-                  outlined
-                  class="mt-4"
-                ></v-text-field>
-                <v-btn 
-                  @click="updatePlayerSpeed" 
-                  color="primary"
-                  block
-                >
-                  Actualizar Velocidad
-                </v-btn>
+              <v-card-text class="pa-6">
+                <v-row align="center" justify="center">
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model.number="playerSpeed"
+                      label="Velocidad del Jugador"
+                      type="number"
+                      variant="outlined"
+                      class="speed-input"
+                      hide-details
+                      bg-color="white"
+                    >
+                      <template v-slot:prepend>
+                        <v-icon color="deep-purple">mdi-speedometer</v-icon>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-btn 
+                      @click="updatePlayerSpeed" 
+                      color="deep-purple"
+                      size="large"
+                      block
+                      elevation="2"
+                      class="px-6 py-3"
+                    >
+                      <v-icon start class="mr-2">mdi-send</v-icon>
+                      Actualizar Velocidad
+                    </v-btn>
+                  </v-col>
+                </v-row>
               </v-card-text>
             </v-card>
           </v-col>
+        </v-row>
 
-          <!-- Sección existente de gestión de imágenes -->
-          <v-col cols="12" md="6">
-            <v-card>
-              <v-card-title class="primary white--text">
+        <!-- Skin Management -->
+        <v-row class="mt-6">
+          <v-col cols="12">
+            <v-card class="elevation-3 rounded-lg">
+              <v-card-title class="text-h5 bg-indigo text-white py-6 rounded-t-lg d-flex align-center">
+                <v-icon size="32" class="mr-4">mdi-palette</v-icon>
                 Gestión de Skins
               </v-card-title>
-              <v-card-text>
-                <v-tabs v-model="imageTab" grow>
-                  <v-tab value="upload">Subir Skin</v-tab>
-                  <v-tab value="select">Seleccionar Skin</v-tab>
+              <v-card-text class="pa-6">
+                <v-tabs
+                  v-model="imageTab"
+                  grow
+                  class="mb-6 custom-tabs"
+                  color="indigo"
+                  bg-color="grey-lighten-4"
+                >
+                  <v-tab value="upload" class="text-subtitle-1 px-6">
+                    <v-icon start class="mr-2">mdi-upload</v-icon>
+                    Subir Skin
+                  </v-tab>
+                  <v-tab value="select" class="text-subtitle-1 px-6">
+                    <v-icon start class="mr-2">mdi-view-grid</v-icon>
+                    Seleccionar Skin
+                  </v-tab>
                 </v-tabs>
 
-                <v-window v-model="imageTab" class="mt-4">
+                <v-window v-model="imageTab">
                   <v-window-item value="upload">
-                    <v-file-input
-                      v-model="selectedImage"
-                      accept="image/*"
-                      label="Seleccionar archivo de skin"
-                      prepend-icon="mdi-image"
-                      outlined
-                      class="mb-4"
-                    ></v-file-input>
-                    <v-btn 
-                      @click="uploadImage" 
-                      color="primary"
-                      :disabled="!selectedImage"
-                      block
-                    >
-                      Subir Skin
-                    </v-btn>
+                    <v-row justify="center">
+                      <v-col cols="12" md="8">
+                        <v-file-input
+                          v-model="selectedImage"
+                          accept="image/*"
+                          label="Seleccionar archivo de skin"
+                          prepend-icon="mdi-image"
+                          variant="outlined"
+                          class="mb-6"
+                          hide-details
+                          bg-color="white"
+                        ></v-file-input>
+                        <v-btn 
+                          @click="uploadImage" 
+                          color="indigo"
+                          :disabled="!selectedImage"
+                          block
+                          size="large"
+                          elevation="2"
+                          class="px-6 py-3"
+                        >
+                          <v-icon start class="mr-2">mdi-cloud-upload</v-icon>
+                          Subir Skin
+                        </v-btn>
+                      </v-col>
+                    </v-row>
                   </v-window-item>
 
                   <v-window-item value="select">
-                    <v-subheader class="pl-0">Skins Disponibles</v-subheader>
                     <div class="image-grid">
-                      <v-card
-                        v-for="image in existingImages"
-                        :key="image.id"
-                        class="image-card"
-                        @click="selectExistingImage(image)"
-                        :class="{ 'selected-skin': selectedImageUrl === image.image_url }"
-                      >
-                        <v-img
-                          :src="image.image_url"
-                          height="150"
-                          contain
-                        ></v-img>
-                        <v-card-actions class="justify-center">
-                          <v-chip small>
-                            {{ getUsageCount(image.image_url) }} usos
-                          </v-chip>
-                        </v-card-actions>
-                      </v-card>
+                      <v-hover v-for="image in existingImages" :key="image.id">
+                        <template v-slot:default="{ isHovering, props }">
+                          <v-card
+                            v-bind="props"
+                            :elevation="isHovering ? 8 : 2"
+                            @click="selectExistingImage(image)"
+                            :class="{ 'selected-skin': selectedImageUrl === image.image_url }"
+                            class="transition-swing skin-card"
+                          >
+                            <v-img
+                              :src="image.image_url"
+                              height="180"
+                              cover
+                              class="bg-grey-lighten-2"
+                            >
+                              <template v-slot:placeholder>
+                                <div class="d-flex align-center justify-center fill-height">
+                                  <v-progress-circular indeterminate color="indigo"></v-progress-circular>
+                                </div>
+                              </template>
+                            </v-img>
+                            <v-card-actions class="justify-center pa-3">
+                              <v-chip
+                                color="indigo"
+                                size="small"
+                                variant="elevated"
+                                class="px-4"
+                              >
+                                <v-icon start size="small">mdi-counter</v-icon>
+                                {{ getUsageCount(image.image_url) }} usos
+                              </v-chip>
+                            </v-card-actions>
+                          </v-card>
+                        </template>
+                      </v-hover>
                     </div>
                   </v-window-item>
                 </v-window>
               </v-card-text>
             </v-card>
           </v-col>
+        </v-row>
 
-          <!-- Nueva sección de estadísticas -->
+        <!-- Statistics -->
+        <v-row class="mt-6">
           <v-col cols="12">
-            <v-card>
-              <v-card-title class="primary white--text">
+            <v-card class="elevation-3 rounded-lg">
+              <v-card-title class="text-h5 bg-purple text-white py-6 rounded-t-lg d-flex align-center">
+                <v-icon size="32" class="mr-4">mdi-chart-box</v-icon>
                 Estadísticas de Skins
               </v-card-title>
-              <v-card-text>
-                <v-row>
+              <v-card-text class="pa-6">
+                <v-row align="center" class="mb-6">
                   <v-col cols="12" md="4">
                     <v-select
                       v-model="statsDaysFilter"
@@ -106,8 +176,11 @@
                         { text: 'Últimos 90 días', value: 90 }
                       ]"
                       label="Filtrar por"
-                      outlined
-                      dense
+                      variant="outlined"
+                      hide-details
+                      bg-color="white"
+                      class="stats-select custom-select"
+                      density="comfortable"
                       @update:modelValue="loadSkinStats"
                     ></v-select>
                   </v-col>
@@ -116,77 +189,101 @@
                       v-model="statsLimit"
                       :items="[5, 10, 20, 50]"
                       label="Mostrar"
-                      outlined
-                      dense
+                      variant="outlined"
+                      hide-details
+                      bg-color="white"
+                      class="stats-select custom-select"
+                      density="comfortable"
                       @update:modelValue="loadSkinStats"
                     ></v-select>
                   </v-col>
                   <v-col cols="12" md="4">
                     <v-btn 
                       @click="loadSkinStats" 
-                      color="primary"
+                      color="purple"
                       block
+                      size="large"
+                      elevation="2"
+                      class="px-6"
                     >
+                      <v-icon start class="mr-2">mdi-refresh</v-icon>
                       Actualizar Estadísticas
                     </v-btn>
                   </v-col>
                 </v-row>
 
-                <v-data-table
-                  :headers="skinStatsHeaders"
-                  :items="skinStats"
-                  :loading="loadingStats"
-                  :items-per-page="statsLimit"
-                  loading-text="Cargando estadísticas..."
-                  no-data-text="No hay datos de estadísticas disponibles"
-                  class="elevation-1 mt-4"
-                >
-                  <template v-slot:item._id="{ item }">
-                    <div class="d-flex align-center">
-                      <v-img
-                        :src="item._id"
-                        height="50"
-                        width="50"
-                        contain
-                        class="mr-4"
-                      ></v-img>
-                      <span class="text-truncate" style="max-width: 200px;">
-                        {{ item._id.split('/').pop() }}
-                      </span>
-                    </div>
-                  </template>
-                  <template v-slot:item.count="{ item }">
-                    <v-chip color="primary">
-                      {{ item.count }} usos
-                    </v-chip>
-                  </template>
-                  <template v-slot:item.last_used="{ item }">
-                    {{ formatDate(item.last_used) }}
-                  </template>
-                  <template v-slot:item.actions="{ item }">
-                    <v-btn
-                      icon
-                      small
-                      @click="selectStatsImage(item._id)"
-                    >
-                      <v-icon>mdi-check</v-icon>
-                    </v-btn>
-                  </template>
-                </v-data-table>
-
-                <v-divider class="my-4"></v-divider>
+                <v-card class="stats-table-card mb-6" elevation="1">
+                  <v-data-table
+                    :headers="skinStatsHeaders"
+                    :items="skinStats"
+                    :loading="loadingStats"
+                    :items-per-page="statsLimit"
+                    loading-text="Cargando estadísticas..."
+                    no-data-text="No hay datos de estadísticas disponibles"
+                  >
+                    <template v-slot:item._id="{ item }">
+                      <div class="d-flex align-center">
+                        <v-img
+                          :src="item._id"
+                          height="50"
+                          width="50"
+                          cover
+                          class="mr-4 rounded"
+                        ></v-img>
+                        <span class="text-subtitle-2">
+                          {{ item._id.split('/').pop() }}
+                        </span>
+                      </div>
+                    </template>
+                    <template v-slot:item.count="{ item }">
+                      <v-chip color="purple" variant="elevated" size="small" class="px-4">
+                        {{ item.count }} usos
+                      </v-chip>
+                    </template>
+                    <template v-slot:item.last_used="{ item }">
+                      <span class="text-subtitle-2">{{ formatDate(item.last_used) }}</span>
+                    </template>
+                    <template v-slot:item.actions="{ item }">
+                      <v-btn
+                        icon
+                        color="purple"
+                        size="small"
+                        variant="flat"
+                        @click="selectStatsImage(item._id)"
+                      >
+                        <v-icon>mdi-check-circle</v-icon>
+                      </v-btn>
+                    </template>
+                  </v-data-table>
+                </v-card>
 
                 <v-row v-if="skinStats.length > 0">
                   <v-col cols="12">
-                    <v-card>
-                      <v-card-title class="subtitle-1">
+                    <v-card class="chart-card" elevation="2">
+                      <v-card-title class="text-h6 pa-4 bg-purple-lighten-5">
+                        <v-icon start color="purple" class="mr-2">mdi-chart-pie</v-icon>
                         Distribución de Uso
                       </v-card-title>
-                      <v-card-text>
+                      <v-card-text class="pa-6">
                         <pie-chart
                           :data="skinStatsChartData"
-                          :options="chartOptions"
-                          style="height: 300px;"
+                          :options="{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'right',
+                                labels: {
+                                  boxWidth: 15,
+                                  padding: 15,
+                                  font: {
+                                    size: 13
+                                  }
+                                }
+                              }
+                            }
+                          }"
+                          style="height: 400px;"
                         ></pie-chart>
                       </v-card-text>
                     </v-card>
@@ -198,13 +295,23 @@
         </v-row>
       </v-container>
 
-      <v-snackbar v-model="snackbar.show" :color="snackbar.color">
-        {{ snackbar.message }}
-        <template v-slot:action="{ attrs }">
-          <v-btn text v-bind="attrs" @click="snackbar.show = false">
-            Cerrar
-          </v-btn>
-        </template>
+      <!-- Notifications -->
+      <v-snackbar
+        v-model="snackbar.show"
+        :color="snackbar.color"
+        location="top"
+        elevation="24"
+        rounded="pill"
+        timeout="3000"
+      >
+        <div class="d-flex align-center">
+          <v-icon
+            :icon="snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle'"
+            start
+            class="mr-2"
+          ></v-icon>
+          {{ snackbar.message }}
+        </div>
       </v-snackbar>
     </v-main>
   </v-app>
@@ -214,6 +321,7 @@
 import PieChart from './components/PieChart.vue';
 
 export default {
+  name: 'App',
   components: {
     PieChart
   },
@@ -440,29 +548,107 @@ export default {
 </script>
 
 <style scoped>
+.gradient-card {
+  background: linear-gradient(135deg, #fff 0%, #f4f0ff 100%);
+}
+
+.speed-input {
+  font-size: 1.2rem;
+}
+
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
-  margin: 16px 0;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 24px;
+  padding: 16px 0;
 }
 
-.image-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
+.skin-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.image-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+.skin-card:hover {
+  transform: translateY(-4px);
 }
 
 .selected-skin {
-  border: 2px solid var(--v-primary-base);
-  box-shadow: 0 0 0 2px var(--v-primary-lighten4);
+  border: 3px solid rgb(var(--v-theme-indigo));
 }
 
-.v-data-table >>> .v-data-table__wrapper tbody tr:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+.stats-select {
+  background-color: white;
+  border-radius: 8px;
+}
+
+.custom-select :deep(.v-field__input) {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  font-size: 0.95rem;
+}
+
+.custom-select :deep(.v-field__outline) {
+  --v-field-border-width: 1px;
+}
+
+.custom-select :deep(.v-field__overlay) {
+  display: none;
+}
+
+.custom-tabs {
+  border: 1px solid rgb(var(--v-theme-indigo));
+}
+
+.custom-tabs :deep(.v-tab) {
+  opacity: 1;
+  border-radius: 0;
+  font-weight: 500;
+  min-height: 48px;
+}
+
+.custom-tabs :deep(.v-tab--selected) {
+  background-color: rgb(var(--v-theme-indigo));
+  color: white;
+}
+
+.custom-tabs :deep(.v-tab:not(.v-tab--selected)) {
+  background-color: var(--v-theme-grey-lighten-4);
+  color: rgb(var(--v-theme-indigo));
+}
+
+.stats-table-card {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chart-card {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.v-card-title {
+  letter-spacing: 0.5px;
+}
+
+.v-btn {
+  text-transform: none;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+:deep(.v-data-table) {
+  background-color: white !important;
+}
+
+:deep(.v-data-table-header) {
+  background-color: #f5f5f5 !important;
+}
+
+:deep(.v-data-table-header th) {
+  font-weight: 600 !important;
+  color: rgba(0, 0, 0, 0.87) !important;
+  text-transform: uppercase;
+  font-size: 0.875rem !important;
 }
 </style>

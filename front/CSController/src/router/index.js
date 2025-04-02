@@ -1,4 +1,3 @@
-
 /**
  * router/index.ts
  *
@@ -6,8 +5,23 @@
  */
 
 // Composables
-import { createRouter, createWebHistory } from 'vue-router/auto'
-import { routes } from 'vue-router/auto-routes'
+import { createRouter, createWebHistory } from 'vue-router'
+
+// Páginas
+import Home from '@/views/Home.vue'
+
+const routes = [
+  {
+    path: '/',
+    component: Home,
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: () => import('@/views/About.vue'),
+  },
+  // Añade aquí más rutas según necesites
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
